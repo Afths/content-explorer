@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activity Builder - Afterhours</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <script crossorigin src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
+</head>
+<body style="margin: 0;">
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const SUPABASE_URL = 'https://aeusujfuxnxwbvccmusk.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFldXN1amZ1eG54d2J2Y2NtdXNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE5MDAwNDAsImV4cCI6MjA1NzQ3NjA0MH0.rMuOA4LyVVao4_alpNopj2E4mpzEHYxBOMJxv6jrOVA';
+
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    function ActivityBuilder() {
+      const [courses, setCourses] = useState([]);
+      const [selectedCourse, setSelectedCourse] = useState(null);
+      const [activities, setActivities] = useState({});
+      const [selectedTopic, setSelectedTopic] = useState(null);
+      const [toasts, setToasts] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState(null);
+
+      const showToast = (msg, type = "info") => {
+        const id = Date.now();
+        setToasts(prev => [...prev, { id, msg, type }]);
+        setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000);
+      };
+
+      // Fetch all data from Supabase on mount
+      useEffect(() => {
+        async function fetchAll() {
+          try {
+            setLoading(true);
+            setError(null);
+
+            const [coursesRes, levelsRes, topicsRes, activitiesRes] = await Promise.all([
+              sb.from('courses').select('*').order('title'),
+              sb.from('levels').select('*').order('order_number'),
+              sb.from('topics').select('*').order('order_number'),
+              sb.from('activities').select('*').order('order_number'),
+            ]);
+
+            if (coursesRes.error) throw coursesRes.error;
+            if (levelsRes.error) throw levelsRes.error;
+            if (topicsRes.error) throw topicsRes.error;
+            if (activitiesRes.error) throw activitiesRes.error;
+
+            // Build hierarchical course data
+            const topicsByLevel = {};
+            topicsRes.data.forEach(t => {
+              if (!topicsByLevel[t.level_id]) topicsByLevel[t.level_id] = [];
+              topicsByLevel[t.level_id].push(t);
+            });
+
+            const levelsByCourse = {};
+            levelsRes.data.forEach(l => {
+              if (!levelsByCourse[l.course_id]) levelsByCourse[l.course_id] = [];
+              levelsByCourse[l.course_id].push({
+                ...l,
+                topics: (topicsByLevel[l.id] || []).sort((a, b) => a.order_number - b.order_number),
+              });
+            });
+
+            const builtCourses = coursesRes.data.map(c => ({
+              ...c,
+              levels: (levelsByCourse[c.id] || []).sort((a, b) => a.order_number - b.order_number),
+            }));
+
+            // Group activities by topic_id
+            const grouped = {};
+            activitiesRes.data.forEach(a => {
+              if (!grouped[a.topic_id]) grouped[a.topic_id] = [];
+              grouped[a.topic_id].push(a);
+            });
+
+            setCourses(builtCourses);
+            setActivities(grouped);
+            setLoading(false);
+            showToast(
+              `Loaded ${builtCourses.length} courses, ${activitiesRes.data.length} activities`,
+              "success"
+            );
+          } catch (err) {
+            console.error('[ActivityBuilder] Error:', err);
+            setError(err.message);
+            setLoading(false);
+            showToast("Error loading data: " + err.message, "error");
+          }
+        }
+        fetchAll();
+      }, []);
+
+      const getActivitiesForTopic = (topicId) => activities[topicId] || [];
+      const backToTopics = () => setSelectedTopic(null);
+      const backToCourses = () => { setSelectedCourse(null); setSelectedTopic(null); };
+
+      const getTypeBreakdown = (topicActivities) => {
+        const breakdown = {};
+        topicActivities.forEach(act => {
+          const type = ['poll', 'text_poll', 'image_poll', 'number_poll'].includes(act.type) ? 'poll' : act.type;
+          breakdown[type] = (breakdown[type] || 0) + 1;
+        });
+        return breakdown;
+      };
+
+      const typeColors = {
+        multiple_choice: '#3B82F6',
+        true_false: '#10B981',
+        poll: '#F59E0B',
+        sorting: '#8B5CF6',
+        myth_or_reality: '#EC4899',
+        image_multiple_choice: '#06B6D4',
+        pair_matching: '#EF4444',
+        text_input: '#6366F1',
+        eduntainment: '#14B8A6'
+      };
+
+      const typeLabels = {
+        multiple_choice: 'Multiple Choice',
+        true_false: 'True/False',
+        poll: 'Poll',
+        sorting: 'Sorting',
+        myth_or_reality: 'Myth or Reality',
+        image_multiple_choice: 'Image Multiple Choice',
+        pair_matching: 'Pair Matching',
+        text_input: 'Text Input',
+        eduntainment: 'Edutainment'
+      };
+
+      const isCorrectOption = (activity, optionIndex) => {
+        const { correct_answer } = activity;
+        return Array.isArray(correct_answer) ? correct_answer.includes(optionIndex) : correct_answer === optionIndex;
+      };
+
+      // Get explanation text for an option
+      const getOptionExplanation = (activity, optIdx) => {
+        const { explanation } = activity;
+        if (!explanation) return "";
+        if (Array.isArray(explanation)) return explanation[optIdx] || "";
+        if (typeof explanation === 'object' && explanation.default) return optIdx === 0 ? explanation.default : "";
+        if (typeof explanation === 'string') return optIdx === 0 ? explanation : "";
+        return "";
+      };
+
+      const container = { minHeight: "100vh", background: "linear-gradient(135deg, #FAF8F5 0%, #F5F1E8 100%)", padding: "16px 12px", fontFamily: "'Inter', -apple-system, sans-serif" };
+      const btnSecondary = { background: "white", color: "#8B4513", border: "1px solid #D4C4B0", padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 500, transition: "all 0.2s" };
+      const card = { background: "white", borderRadius: 8, padding: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", marginBottom: 8, border: "1px solid #F0E9DC", transition: "all 0.2s" };
+      const badge = { display: "inline-block", padding: "2px 6px", borderRadius: 4, fontSize: 9, fontWeight: 600, marginRight: 4, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.3px" };
+      const levelPill = { display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 20, height: 20, padding: "0 6px", borderRadius: 10, background: "#8B4513", color: "white", fontSize: 11, fontWeight: 700, marginLeft: 8 };
+      const toastContainer = { position: "fixed", top: 12, right: 12, zIndex: 9999, display: "flex", flexDirection: "column", gap: 6 };
+      const toastStyle = (type) => ({ padding: "8px 14px", borderRadius: 6, color: "white", fontSize: 12, fontWeight: 500, boxShadow: "0 2px 8px rgba(0,0,0,0.15)", background: type === "success" ? "#10B981" : type === "error" ? "#EF4444" : "#3B82F6", animation: "slideIn 0.3s ease" });
+
+      const courseData = selectedCourse;
+      const totalTopics = courseData ? courseData.levels.reduce((sum, l) => sum + l.topics.length, 0) : 0;
+      const totalActivities = courseData ? courseData.levels.reduce((sum, l) => sum + l.topics.reduce((s, t) => s + getActivitiesForTopic(t.id).length, 0), 0) : 0;
+
+      return (
+        <div style={container}>
+          <style>{`@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } } button:hover { transform: translateY(-1px); }`}</style>
+          <div style={toastContainer}>{toasts.map((t) => <div key={t.id} style={toastStyle(t.type)}>{t.msg}</div>)}</div>
+
+          {loading && (
+            <div style={{ maxWidth: 1400, margin: "0 auto", padding: 40, textAlign: "center" }}>
+              <div style={{ fontSize: 16, color: "#8B7355", marginBottom: 12 }}>Loading from Supabase...</div>
+              <div style={{ fontSize: 12, color: "#A0A0A0" }}>Fetching courses, topics & activities</div>
+            </div>
+          )}
+
+          {error && (
+            <div style={{ maxWidth: 1400, margin: "0 auto", padding: 20, background: "#FEE2E2", borderRadius: 8, border: "1px solid #FCA5A5" }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#991B1B", marginBottom: 4 }}>Error Loading Data</div>
+              <div style={{ fontSize: 12, color: "#7F1D1D" }}>{error}</div>
+            </div>
+          )}
+
+          {!loading && !error && (
+          <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+
+            {/* Course selection view */}
+            {!selectedCourse && (
+              <div>
+                <div style={{ marginBottom: 16 }}>
+                  <h1 style={{ margin: 0, fontSize: 20, fontFamily: "'Playfair Display', serif", color: "#2C1810", fontWeight: 700 }}>
+                    Afterhours Courses
+                  </h1>
+                  <div style={{ fontSize: 11, color: "#8B7355", marginTop: 4 }}>{courses.length} Courses</div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {courses.map(course => {
+                    const topicCount = course.levels.reduce((sum, l) => sum + l.topics.length, 0);
+                    const actCount = course.levels.reduce((sum, l) => sum + l.topics.reduce((s, t) => s + getActivitiesForTopic(t.id).length, 0), 0);
+                    return (
+                      <div key={course.id} style={{ ...card, display: "flex", alignItems: "center", padding: 12, cursor: "pointer" }} onClick={() => setSelectedCourse(course)} onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 2px 8px rgba(139,69,19,0.12)")} onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.06)")}>
+                        {course.icon && <div style={{ fontSize: 24, marginRight: 12 }}>{course.icon}</div>}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: "#2C1810" }}>{course.title}</div>
+                          <div style={{ fontSize: 11, color: "#8B7355", marginTop: 2 }}>{course.levels.length} Levels &bull; {topicCount} Topics &bull; {actCount} Activities</div>
+                        </div>
+                        <div style={{ fontSize: 18, color: "#D4C4B0" }}>&rsaquo;</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Level/topic view (existing UI) */}
+            {selectedCourse && (
+              <div>
+                <div style={{ marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div>
+                    <h1 style={{ margin: 0, fontSize: 20, fontFamily: "'Playfair Display', serif", color: "#2C1810", fontWeight: 700 }}>
+                      {selectedTopic ? selectedTopic.title : courseData.title}
+                    </h1>
+                    {!selectedTopic && (<><div style={{ fontSize: 11, color: "#8B7355", marginTop: 4 }}>{courseData.levels.length} Levels &bull; {totalTopics} Topics &bull; {totalActivities} Activities</div></>)}
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {selectedTopic && <button onClick={backToTopics} style={btnSecondary}>&larr; Back</button>}
+                    {!selectedTopic && <button onClick={backToCourses} style={btnSecondary}>&larr; Courses</button>}
+                  </div>
+                </div>
+                {!selectedTopic && courseData.levels.map((level) => (
+                  <div key={level.id} style={{ marginBottom: 20 }}>
+                    <div style={{ marginBottom: 8, display: "flex", alignItems: "center" }}><h2 style={{ margin: 0, fontSize: 14, color: "#2C1810", fontWeight: 700 }}>{level.title}</h2><div style={levelPill}>{level.topics.length}</div></div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {level.topics.map((topic) => {
+                        const topicActivities = getActivitiesForTopic(topic.id);
+                        const activityCount = topicActivities.length;
+                        const breakdown = getTypeBreakdown(topicActivities);
+                        const total = activityCount;
+                        return (
+                          <div key={topic.id} style={{ ...card, display: "flex", flexDirection: "column", padding: 10, cursor: "pointer" }} onClick={() => setSelectedTopic(topic)} onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 2px 8px rgba(139,69,19,0.12)")} onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.06)")}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: activityCount > 0 ? 8 : 0 }}>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: "#2C1810", marginBottom: 4 }}>{topic.title}</div>
+                                {topic.tags && topic.tags.length > 0 && (<div style={{ display: "flex", flexWrap: "wrap" }}>{topic.tags.map((tag, idx) => <span key={idx} style={{ ...badge, background: "#F5F1E8", color: "#8B4513", border: "1px solid #D4C4B0" }}>{tag}</span>)}</div>)}
+                              </div>
+                              <div style={{ fontSize: 16, fontWeight: 700, color: activityCount > 0 ? "#8B4513" : "#D4C4B0", marginLeft: 16, minWidth: 30, textAlign: "right" }}>{activityCount}</div>
+                            </div>
+                            {activityCount > 0 && (
+                              <div style={{ display: "flex", height: 6, borderRadius: 3, overflow: "hidden", background: "#F5F1E8" }}>
+                                {Object.entries(breakdown).map(([type, count]) => {
+                                  const percentage = (count / total) * 100;
+                                  return (
+                                    <div key={type} title={`${typeLabels[type] || type}: ${count}`} style={{ width: `${percentage}%`, background: typeColors[type] || "#9CA3AF", transition: "opacity 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.8")} onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")} />
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+                {selectedTopic && (
+                  <div>
+                    <div style={{ marginBottom: 12 }}>
+                      {selectedTopic.tags && selectedTopic.tags.length > 0 && (<div style={{ display: "flex", flexWrap: "wrap", marginBottom: 8 }}>{selectedTopic.tags.map((tag, idx) => <span key={idx} style={{ ...badge, background: "#F5F1E8", color: "#8B4513", border: "1px solid #D4C4B0" }}>{tag}</span>)}</div>)}
+                      <div style={{ fontSize: 11, color: "#8B7355" }}>{getActivitiesForTopic(selectedTopic.id).length} {getActivitiesForTopic(selectedTopic.id).length === 1 ? "activity" : "activities"}</div>
+                    </div>
+                    {getActivitiesForTopic(selectedTopic.id).length === 0 ? (
+                      <div style={card}><div style={{ textAlign: "center", padding: 20, color: "#8B7355", fontSize: 12 }}>No activities yet for this topic.</div></div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {getActivitiesForTopic(selectedTopic.id).map((activity, idx) => (
+                          <div key={activity.id || idx} style={card}>
+                            <div style={{ display: "flex", alignItems: "start", gap: 10 }}>
+                              <div style={{ minWidth: 22, height: 22, borderRadius: "50%", background: "#F5F1E8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: "#8B4513" }}>{idx + 1}</div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ marginBottom: 8 }}>
+                                  <div style={{ display: "inline-block", padding: "2px 8px", borderRadius: 4, background: "#F5F1E8", fontSize: 9, fontWeight: 700, color: "#8B4513", textTransform: "uppercase", letterSpacing: "0.5px" }}>{activity.type.replace(/_/g, " ")}</div>
+                                  {Array.isArray(activity.correct_answer) && <span style={{ marginLeft: 6, padding: "2px 6px", borderRadius: 4, background: "#DDD6FE", color: "#5B21B6", fontSize: 9, fontWeight: 600, textTransform: "uppercase" }}>MULTI-ANSWER</span>}
+                                </div>
+                                <div style={{ fontSize: 13, color: "#2C1810", lineHeight: 1.5, marginTop: 6 }}>{activity.main_text}</div>
+                                {activity.options && activity.options.length > 0 && (
+                                  <div style={{ marginTop: 10 }}>
+                                    {activity.options.map((option, optIdx) => {
+                                      const isCorrect = isCorrectOption(activity, optIdx);
+                                      const explanation = getOptionExplanation(activity, optIdx);
+                                      return (
+                                        <div key={optIdx} style={{ padding: "8px 12px", marginBottom: 4, borderRadius: 6, background: isCorrect ? "#D1FAE5" : "#F9FAFB", border: isCorrect ? "1px solid #6EE7B7" : "1px solid #E5E7EB", fontSize: 12, color: isCorrect ? "#065F46" : "#374151" }}>
+                                          <div>{option}</div>
+                                          {explanation && <div style={{ fontSize: 10, marginTop: 4, color: isCorrect ? "#047857" : "#6B7280", fontStyle: "italic", lineHeight: 1.4 }}>{explanation}</div>}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                                {activity.author_comment && <div style={{ marginTop: 8, fontSize: 10, color: "#8B7355", fontStyle: "italic", lineHeight: 1.4 }} dangerouslySetInnerHTML={{ __html: activity.author_comment }} />}
+                                {activity.embed_url && <div style={{ marginTop: 10 }}><a href={activity.embed_url} target="_blank" rel="noopener noreferrer" style={{ color: "#8B4513", fontSize: 11, textDecoration: "none", fontWeight: 600 }}>&#128279; View Resource &rarr;</a></div>}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+          </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<ActivityBuilder />);
+  </script>
+</body>
+</html>
