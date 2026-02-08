@@ -8,7 +8,6 @@
   <script crossorigin src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
 </head>
 <body style="margin: 0;">
   <div id="root"></div>
@@ -17,8 +16,15 @@
 
     const SUPABASE_URL = 'https://aeusujfuxnxwbvccmusk.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFldXN1amZ1eG54d2J2Y2NtdXNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE5MDAwNDAsImV4cCI6MjA1NzQ3NjA0MH0.rMuOA4LyVVao4_alpNopj2E4mpzEHYxBOMJxv6jrOVA';
+    const APP_URL = 'https://app.afths.com';
+    const HEADERS = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY };
 
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    async function sbFetch(table, params) {
+      const url = SUPABASE_URL + '/rest/v1/' + table + '?select=*&' + params;
+      const res = await fetch(url, { headers: HEADERS });
+      if (!res.ok) throw new Error(table + ': ' + res.statusText);
+      return res.json();
+    }
 
     function ActivityBuilder() {
       const [courses, setCourses] = useState([]);
@@ -42,27 +48,22 @@
             setLoading(true);
             setError(null);
 
-            const [coursesRes, levelsRes, topicsRes, activitiesRes] = await Promise.all([
-              sb.from('courses').select('*').order('title'),
-              sb.from('levels').select('*').order('order_number'),
-              sb.from('topics').select('*').order('order_number'),
-              sb.from('activities').select('*').order('order_number'),
+            const [coursesData, levelsData, topicsData, activitiesData] = await Promise.all([
+              sbFetch('courses', 'order=title'),
+              sbFetch('levels', 'order=order_number'),
+              sbFetch('topics', 'order=order_number'),
+              sbFetch('activities', 'order=order_number'),
             ]);
-
-            if (coursesRes.error) throw coursesRes.error;
-            if (levelsRes.error) throw levelsRes.error;
-            if (topicsRes.error) throw topicsRes.error;
-            if (activitiesRes.error) throw activitiesRes.error;
 
             // Build hierarchical course data
             const topicsByLevel = {};
-            topicsRes.data.forEach(t => {
+            topicsData.forEach(t => {
               if (!topicsByLevel[t.level_id]) topicsByLevel[t.level_id] = [];
               topicsByLevel[t.level_id].push(t);
             });
 
             const levelsByCourse = {};
-            levelsRes.data.forEach(l => {
+            levelsData.forEach(l => {
               if (!levelsByCourse[l.course_id]) levelsByCourse[l.course_id] = [];
               levelsByCourse[l.course_id].push({
                 ...l,
@@ -70,14 +71,14 @@
               });
             });
 
-            const builtCourses = coursesRes.data.map(c => ({
+            const builtCourses = coursesData.map(c => ({
               ...c,
               levels: (levelsByCourse[c.id] || []).sort((a, b) => a.order_number - b.order_number),
             }));
 
             // Group activities by topic_id
             const grouped = {};
-            activitiesRes.data.forEach(a => {
+            activitiesData.forEach(a => {
               if (!grouped[a.topic_id]) grouped[a.topic_id] = [];
               grouped[a.topic_id].push(a);
             });
@@ -86,7 +87,7 @@
             setActivities(grouped);
             setLoading(false);
             showToast(
-              `Loaded ${builtCourses.length} courses, ${activitiesRes.data.length} activities`,
+              `Loaded ${builtCourses.length} courses, ${activitiesData.length} activities`,
               "success"
             );
           } catch (err) {
@@ -200,7 +201,7 @@
                     const actCount = course.levels.reduce((sum, l) => sum + l.topics.reduce((s, t) => s + getActivitiesForTopic(t.id).length, 0), 0);
                     return (
                       <div key={course.id} style={{ ...card, display: "flex", alignItems: "center", padding: 12, cursor: "pointer" }} onClick={() => setSelectedCourse(course)} onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 2px 8px rgba(139,69,19,0.12)")} onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.06)")}>
-                        {course.icon && <div style={{ fontSize: 24, marginRight: 12 }}>{course.icon}</div>}
+                        {course.icon && <img src={APP_URL + course.icon} alt="" style={{ width: 28, height: 28, marginRight: 12 }} onError={(e) => e.target.style.display = 'none'} />}
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 14, fontWeight: 600, color: "#2C1810" }}>{course.title}</div>
                           <div style={{ fontSize: 11, color: "#8B7355", marginTop: 2 }}>{course.levels.length} Levels &bull; {topicCount} Topics &bull; {actCount} Activities</div>
