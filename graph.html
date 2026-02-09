@@ -404,29 +404,60 @@
         /* Loading */
         .loading {
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
+            top: 20px;
+            right: 20px;
             z-index: 2000;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 12px;
+            text-align: left;
+            background: rgba(10, 10, 15, 0.9);
+            border: 1px solid rgba(78, 205, 196, 0.3);
+            border-radius: 8px;
+            padding: 16px 20px;
+            min-width: 280px;
+            backdrop-filter: blur(10px);
         }
 
         .loading.hidden {
-            display: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
         }
 
-        .spinner {
-            width: 50px;
-            height: 50px;
-            margin: 0 auto 20px;
-            border: 3px solid rgba(255, 255, 255, 0.1);
-            border-top-color: var(--color-wild);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
+        .load-line {
+            margin-bottom: 6px;
+            opacity: 0.3;
+            transition: opacity 0.3s;
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        .load-line.active {
+            opacity: 1;
+        }
+
+        .load-line.done {
+            opacity: 0.6;
+        }
+
+        .load-prefix {
+            color: #4ECDC4;
+        }
+
+        .load-count {
+            color: #FFE66D;
+        }
+
+        .load-cursor {
+            display: inline-block;
+            width: 7px;
+            height: 13px;
+            background: #4ECDC4;
+            margin-left: 4px;
+            vertical-align: middle;
+            animation: blink 0.8s step-end infinite;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
         }
 
         .filter-controls {
@@ -458,8 +489,12 @@
         </button>
 
         <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <div>Loading Graph...</div>
+            <div id="load-line-init" class="load-line active"><span class="load-prefix">&gt;</span> initializing graph_engine<span class="load-cursor"></span></div>
+            <div id="load-line-areas" class="load-line"><span class="load-prefix">&gt;</span> loading areas...</div>
+            <div id="load-line-courses" class="load-line"><span class="load-prefix">&gt;</span> fetching courses...</div>
+            <div id="load-line-topics" class="load-line"><span class="load-prefix">&gt;</span> forming skills...</div>
+            <div id="load-line-links" class="load-line"><span class="load-prefix">&gt;</span> creating links...</div>
+            <div id="load-line-render" class="load-line"><span class="load-prefix">&gt;</span> rendering force graph...</div>
         </div>
 
         <!-- Graph View -->
@@ -578,22 +613,46 @@
             return res.json();
         }
 
+        function loadStep(id, text) {
+            const el = document.getElementById(id);
+            el.classList.add('active');
+            el.innerHTML = `<span class="load-prefix">&gt;</span> ${text}<span class="load-cursor"></span>`;
+        }
+
+        function loadDone(id, text) {
+            const el = document.getElementById(id);
+            el.classList.remove('active');
+            el.classList.add('done');
+            el.innerHTML = `<span class="load-prefix">✓</span> ${text}`;
+        }
+
         // Load and initialize
         async function init() {
             try {
-                console.log('Starting init...');
+                loadStep('load-line-init', 'initializing graph_engine');
+                await new Promise(r => setTimeout(r, 200));
+                loadDone('load-line-init', 'graph_engine v3.7 ready');
 
-                // Fetch all tables in parallel
-                const [areas, courses, levels, topics, topicLinks] = await Promise.all([
-                    fetchTable('areas', 'select=id,title,order_number&order=order_number'),
+                loadStep('load-line-areas', 'loading areas...');
+                const areas = await fetchTable('areas', 'select=id,title,order_number&order=order_number');
+                loadDone('load-line-areas', `loaded <span class="load-count">${areas.length}</span> areas`);
+
+                loadStep('load-line-courses', 'fetching courses...');
+                const [courses, levels] = await Promise.all([
                     fetchTable('courses', 'select=id,title,color,status,area_id'),
-                    fetchTable('levels', 'select=id,course_id'),
-                    fetchTable('topics', 'select=id,level_id,title'),
-                    fetchTable('topic_links', 'select=topic_a_id,topic_b_id,strength')
-                        .catch(() => []) // table may not exist yet
+                    fetchTable('levels', 'select=id,course_id')
                 ]);
+                loadDone('load-line-courses', `fetched <span class="load-count">${courses.length}</span> courses`);
 
-                console.log('Fetched:', areas.length, 'areas,', courses.length, 'courses,', topics.length, 'topics,', topicLinks.length, 'topic_links');
+                loadStep('load-line-topics', 'forming skills...');
+                const topics = await fetchTable('topics', 'select=id,level_id,title');
+                loadDone('load-line-topics', `formed <span class="load-count">${topics.length}</span> skills`);
+
+                loadStep('load-line-links', 'creating links...');
+                const topicLinks = await fetchTable('topic_links', 'select=topic_a_id,topic_b_id,strength').catch(() => []);
+                loadDone('load-line-links', `created <span class="load-count">${topicLinks.length}</span> links`);
+
+                loadStep('load-line-render', 'rendering force graph...');
 
                 // Build lookups
                 const levelToCourse = {};
@@ -672,8 +731,9 @@
                 initGraph();
                 initTable();
 
-                document.getElementById('loading').classList.add('hidden');
-                console.log('Loading complete');
+                const connectedCount = data.topics.filter(t => t.connectionCount > 0).length;
+                loadDone('load-line-render', `rendered <span class="load-count">${connectedCount}</span> nodes`);
+                setTimeout(() => document.getElementById('loading').classList.add('hidden'), 1500);
             } catch (error) {
                 console.error('Error loading data:', error);
                 document.getElementById('loading').innerHTML = '<div>Error: ' + error.message + '</div>';
