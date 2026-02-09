@@ -612,6 +612,7 @@
                     return {
                         id: t.id,
                         courseId: courseId,
+                        courseName: course ? course.title : '',
                         areaId: course ? course.area_id : null,
                         name: t.title,
                         description: '',
@@ -625,12 +626,18 @@
                 transformedTopics.forEach(t => { topicById[t.id] = t; });
 
                 // Explicit relationships from topic_links (strength 0-1 scaled to 1-10)
-                const relationships = topicLinks.map(l => ({
-                    source: l.topic_a_id,
-                    target: l.topic_b_id,
-                    strength: Math.round(l.strength * 10),
-                    reason: ''
-                })).filter(r => topicById[r.source] && topicById[r.target]);
+                // Boost same-course links by +2 (0.2 on 0-1 scale) so they cluster together
+                const relationships = topicLinks.map(l => {
+                    const src = topicById[l.topic_a_id];
+                    const tgt = topicById[l.topic_b_id];
+                    const sameCourse = src && tgt && src.courseId === tgt.courseId;
+                    return {
+                        source: l.topic_a_id,
+                        target: l.topic_b_id,
+                        strength: Math.min(10, Math.round(l.strength * 10) + (sameCourse ? 2 : 0)),
+                        reason: ''
+                    };
+                }).filter(r => topicById[r.source] && topicById[r.target]);
 
                 // Calculate connectionCount and totalConnectionStrength per topic
                 relationships.forEach(r => {
@@ -843,10 +850,9 @@
 
             // Store calculated positions and reset to center
             nodes.forEach(node => {
-                // Variable size based on total connection strength from database (12-40 radius)
-                const strength = node.totalConnectionStrength || 0;
-                // Scale: strength ranges from ~10-120, map to radius 12-40
-                node.radius = 12 + Math.min((strength / 4.5), 28);
+                // Variable size based on connection count (1-8 range, map to radius 10-40)
+                const count = node.connectionCount || 1;
+                node.radius = 10 + Math.pow(count, 0.8) * 5;
 
                 node.targetX = node.x;
                 node.targetY = node.y;
@@ -1115,8 +1121,8 @@
                     .style('top', (event.pageY + 15) + 'px')
                     .html(`
                         <h3>${d.name}</h3>
-                        <p>${d.description}</p>
-                        <div class="connections">${connections} connections • Total strength: ${totalStrength}</div>
+                        <p style="opacity:0.6; font-size:11px;">${d.courseName}</p>
+                        <div class="connections">${connections} connections</div>
                     `)
                     .classed('visible', true);
             }
