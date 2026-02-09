@@ -298,7 +298,7 @@
         return <div onClick={() => setEditingField(fieldKey)} style={{ ...style, cursor: 'text', borderBottom: '1px dashed transparent' }} onMouseEnter={(e) => e.currentTarget.style.borderBottomColor = '#D4C4B0'} onMouseLeave={(e) => e.currentTarget.style.borderBottomColor = 'transparent'}>{value || <span style={{ color: '#CCC', fontStyle: 'italic' }}>Click to edit</span>}</div>;
       };
 
-      const container = { minHeight: "100vh", background: "linear-gradient(135deg, #FAF8F5 0%, #F5F1E8 100%)", padding: "16px 12px", fontFamily: "'Inter', -apple-system, sans-serif" };
+      const container = { minHeight: "100vh", background: "linear-gradient(135deg, #FAF8F5 0%, #F5F1E8 100%)", backgroundImage: "url('https://www.transparenttextures.com/patterns/old-map.png'), linear-gradient(135deg, #FAF8F5 0%, #F5F1E8 100%)", padding: "16px 12px", fontFamily: "'Inter', -apple-system, sans-serif" };
       const btnSecondary = { background: "white", color: "#8B4513", border: "1px solid #D4C4B0", padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 500, transition: "all 0.2s" };
       const card = { background: "white", borderRadius: 8, padding: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", marginBottom: 8, border: "1px solid #F0E9DC", transition: "all 0.2s" };
       const badge = { display: "inline-block", padding: "2px 6px", borderRadius: 4, fontSize: 9, fontWeight: 600, marginRight: 4, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.3px" };
@@ -347,54 +347,38 @@
                   if (areaCourses.length === 0) return null;
                   const statusPill = { display: "inline-block", padding: "2px 8px", borderRadius: 10, fontSize: 9, fontWeight: 600, letterSpacing: "0.3px", textTransform: "uppercase", whiteSpace: "nowrap" };
                   const statusStyles = {
-                    ACTIVE: { ...statusPill, background: "rgba(209,250,229,0.9)", color: "#065F46" },
-                    COMING_SOON: { ...statusPill, background: "rgba(254,243,199,0.9)", color: "#92400E" },
-                    DRAFT: { ...statusPill, background: "rgba(243,244,246,0.9)", color: "#9CA3AF" },
+                    ACTIVE: { ...statusPill, background: "#D1FAE5", color: "#065F46" },
+                    COMING_SOON: { ...statusPill, background: "#FEF3C7", color: "#92400E" },
+                    DRAFT: { ...statusPill, background: "#F3F4F6", color: "#9CA3AF" },
                   };
-                  const areaImgs = {
-                    '9af1fd24-e927-4150-b5af-106294a73e72': 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=600&q=80',
-                    '2dc92569-9f3d-4db1-86bb-532d5a64b02f': 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=600&q=80',
-                    '16ef8886-4778-4b49-a5e7-ed9a40e758e6': 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=600&q=80',
-                    '4206cc87-9160-4daa-834f-87cdc4f4da9b': 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=600&q=80',
-                    'ed364f80-877f-463e-9e00-d66ac505af8e': 'https://images.unsplash.com/photo-1497032628192-86f99bcd76bc?w=600&q=80',
-                    '1e74e2f3-c24a-4eb7-b5ae-ef8faa3d1e80': 'https://images.unsplash.com/photo-1456324504439-367cee3b3c32?w=600&q=80',
-                    'f3c61d89-723e-47ac-a5c9-90bfd859404d': 'https://images.unsplash.com/photo-1452587925148-ce544e77e70d?w=600&q=80',
-                    '74c5853c-82de-433c-925f-1d2baca64dc6': 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=600&q=80',
-                  };
-                  const bgImg = areaImgs[area.id] || '';
                   return (
-                    <div key={area.id} style={{ borderRadius: 10, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.1)", position: "relative", backgroundImage: `url(${bgImg})`, backgroundSize: "cover", backgroundPosition: "center", display: "flex", flexDirection: "column" }}>
-                      {/* Dark overlay */}
-                      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", borderRadius: 10 }} />
-                      {/* Content on top */}
-                      <div style={{ position: "relative", zIndex: 1, padding: 14, display: "flex", flexDirection: "column", height: "100%" }}>
-                        <div style={{ marginBottom: 10 }}>
-                          <div style={{ display: "flex", alignItems: "center" }}>
-                            <h2 style={{ margin: 0, fontSize: 13, color: "white", fontWeight: 700 }}>{area.title}</h2>
-                            <div style={{ ...levelPill, background: "rgba(255,255,255,0.25)", color: "white" }}>{areaCourses.length}</div>
-                          </div>
-                          {area.description && <div style={{ fontSize: 10, color: "rgba(255,255,255,0.7)", marginTop: 2 }}>{area.description}</div>}
+                    <div key={area.id} style={{ background: "white", borderRadius: 10, padding: 14, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", border: "1px solid #F0E9DC" }}>
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          <h2 style={{ margin: 0, fontSize: 13, color: "#2C1810", fontWeight: 700 }}>{area.title}</h2>
+                          <div style={levelPill}>{areaCourses.length}</div>
                         </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          {[...areaCourses].sort((a, b) => { const o = { ACTIVE: 0, COMING_SOON: 1, DRAFT: 2 }; return (o[a.status] ?? 2) - (o[b.status] ?? 2); }).map(course => {
-                            const isDraft = course.status === 'DRAFT';
-                            const topicCount = course.levels.reduce((sum, l) => sum + l.topics.length, 0);
-                            const actCount = course.levels.reduce((sum, l) => sum + l.topics.reduce((s, t) => s + getActivitiesForTopic(t.id).length, 0), 0);
-                            return (
-                              <div key={course.id} style={{ background: "rgba(255,255,255,0.93)", borderRadius: 6, padding: "8px 10px", cursor: "pointer", opacity: isDraft ? 0.5 : 1, transition: "all 0.2s" }} onClick={() => setSelectedCourse(course)} onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,1)")} onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.93)")}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                  {course.icon && <img src={APP_URL + course.icon} alt="" style={{ width: 22, height: 22, flexShrink: 0 }} onError={(e) => e.target.style.display = 'none'} />}
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ fontSize: 12, fontWeight: 600, color: "#2C1810" }}>{course.title}</div>
-                                    <div style={{ fontSize: 10, color: "#8B7355", marginTop: 1 }}>{course.levels.length}L &bull; {topicCount}T &bull; {actCount}A</div>
-                                    {course.skill_tags && course.skill_tags.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 3 }}>{course.skill_tags.map((tag, i) => <span key={i} style={{ fontSize: 8, padding: "1px 5px", borderRadius: 8, background: "#F0E9DC", color: "#8B7355", fontWeight: 500, lineHeight: "14px" }}>{tag}</span>)}</div>}
-                                  </div>
-                                  <span style={statusStyles[course.status] || statusStyles.DRAFT}>{(course.status || 'DRAFT').replace('_', ' ')}</span>
+                        {area.description && <div style={{ fontSize: 10, color: "#8B7355", marginTop: 2 }}>{area.description}</div>}
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {[...areaCourses].sort((a, b) => { const o = { ACTIVE: 0, COMING_SOON: 1, DRAFT: 2 }; return (o[a.status] ?? 2) - (o[b.status] ?? 2); }).map(course => {
+                          const isDraft = course.status === 'DRAFT';
+                          const topicCount = course.levels.reduce((sum, l) => sum + l.topics.length, 0);
+                          const actCount = course.levels.reduce((sum, l) => sum + l.topics.reduce((s, t) => s + getActivitiesForTopic(t.id).length, 0), 0);
+                          return (
+                            <div key={course.id} style={{ background: "#FAFAF8", borderRadius: 6, padding: "8px 10px", cursor: "pointer", opacity: isDraft ? 0.5 : 1, border: "1px solid #F0E9DC", transition: "all 0.2s" }} onClick={() => setSelectedCourse(course)} onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 2px 8px rgba(139,69,19,0.12)")} onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}>
+                              <div style={{ marginBottom: 4 }}><span style={statusStyles[course.status] || statusStyles.DRAFT}>{(course.status || 'DRAFT').replace('_', ' ')}</span></div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                {course.icon && <img src={APP_URL + course.icon} alt="" style={{ width: 22, height: 22, flexShrink: 0 }} onError={(e) => e.target.style.display = 'none'} />}
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 12, fontWeight: 600, color: "#2C1810" }}>{course.title}</div>
+                                  <div style={{ fontSize: 10, color: "#8B7355", marginTop: 1 }}>{course.levels.length}L &bull; {topicCount}T &bull; {actCount}A</div>
+                                  {course.skill_tags && course.skill_tags.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 3 }}>{course.skill_tags.map((tag, i) => <span key={i} style={{ fontSize: 8, padding: "1px 5px", borderRadius: 8, background: "#F0E9DC", color: "#8B7355", fontWeight: 500, lineHeight: "14px" }}>{tag}</span>)}</div>}
                                 </div>
                               </div>
-                            );
-                          })}
-                        </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
