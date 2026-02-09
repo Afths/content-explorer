@@ -860,9 +860,9 @@
 
             // Store calculated positions and reset to center
             nodes.forEach(node => {
-                // Variable size based on connection count (1-8 range, map to radius 8-45)
+                // Variable size based on connection count (1-8 range, map to radius 6-50)
                 const count = node.connectionCount || 1;
-                node.radius = 8 + Math.pow(count, 1.2) * 3.5;
+                node.radius = 6 + Math.pow(count, 1.5) * 3;
 
                 node.targetX = node.x;
                 node.targetY = node.y;
@@ -871,9 +871,9 @@
                 node.displayX = width / 2;
                 node.displayY = height / 2;
                 node.organicPhase = Math.random() * Math.PI * 2;
-                node.organicSpeed = 0.3 + Math.random() * 0.3; // Slow and classy
-                // Bigger nodes move less (more mass) - subtle movement
-                node.organicAmplitude = Math.max(8, 15 - (node.radius / 4));
+                node.organicSpeed = 0.5 + Math.random() * 0.4;
+                // Bigger nodes move less (more mass)
+                node.organicAmplitude = Math.max(12, 22 - (node.radius / 4));
             });
 
             // Restart simulation with positions reset
@@ -1009,8 +1009,8 @@
 
                 // Subtle screen rotation (update only every 2nd frame for performance)
                 if (unfoldProgress >= 1 && frameCounter % 2 === 0) {
-                    rotationAngle += 0.008; // Very slow, classy rotation
-                    rotationContainer.attr('transform', `rotate(${Math.sin(rotationAngle) * 1.5})`);
+                    rotationAngle += 0.015;
+                    rotationContainer.attr('transform', `rotate(${Math.sin(rotationAngle) * 2.5})`);
                 }
 
                 // Update node positions with unfold animation
